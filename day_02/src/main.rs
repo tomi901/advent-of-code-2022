@@ -1,5 +1,7 @@
 
-#[derive(Debug)]
+// Note: Could've simplified this a lot by making these shapes ints instead
+// And we calculate wins if (0 > 1 > 2 > 0...)
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum Shape {
     Rock,
     Paper,
@@ -16,27 +18,41 @@ impl Shape {
     }
 
     pub fn result_against(&self, other: &Self) -> RoundResult {
-        match self {
-            Self::Rock => match other {
-                Self::Rock => RoundResult::Tie,
-                Self::Paper => RoundResult::Lose,
-                Self::Scissors => RoundResult::Win,
-            },
-            Self::Paper => match other {
-                Self::Rock => RoundResult::Win,
-                Self::Paper => RoundResult::Tie,
-                Self::Scissors => RoundResult::Lose,
-            },
-            Self::Scissors => match other {
-                Self::Rock => RoundResult::Lose,
-                Self::Paper => RoundResult::Win,
-                Self::Scissors => RoundResult::Tie,
-            },
+        if self == other {
+            RoundResult::Tie
+        } else if &self.wins_against() == other {
+            RoundResult::Win
+        } else {
+            RoundResult::Lose
         }
     }
 
     pub fn score_against(&self, other: &Self) -> u64 {
         self.base_score() + self.result_against(&other).score()
+    }
+
+    pub fn wins_against(&self) -> Self {
+        match self {
+            Self::Rock => Self::Scissors,
+            Self::Paper => Self::Rock,
+            Self::Scissors => Self::Paper,
+        }
+    }
+
+    pub fn loses_against(&self) -> Self {
+        match self {
+            Self::Rock => Self::Paper,
+            Self::Paper => Self::Scissors,
+            Self::Scissors => Self::Rock,
+        }
+    }
+
+    pub fn get_opponent_shape(&self, expected_result: &RoundResult) -> Self {
+        match expected_result {
+            RoundResult::Lose => self.loses_against(),
+            RoundResult::Tie => self.clone(),
+            RoundResult::Win => self.wins_against(),
+        }
     }
 
     pub fn from_str(s: &str) -> Self {
@@ -59,14 +75,35 @@ enum RoundResult {
 impl RoundResult {
     pub fn score(&self) -> u64 {
         match self {
-            RoundResult::Lose => 0,
-            RoundResult::Tie => 3,
-            RoundResult::Win => 6,
+            Self::Lose => 0,
+            Self::Tie => 3,
+            Self::Win => 6,
+        }
+    }
+
+    pub fn inverted(&self) -> Self {
+        match self {
+            Self::Lose => Self::Win,
+            Self::Tie => Self::Tie,
+            Self::Win => Self::Lose,
+        }
+    }
+
+    pub fn from_str(s: &str) -> Self {
+        match s {
+            "A" | "X" => Self::Lose,
+            "B" | "Y" => Self::Tie,
+            "C" | "Z" => Self::Win,
+            _ => todo!("Not implemented: {}", s),
         }
     }
 }
 
 fn main() {
+    part_2();
+}
+
+fn part_1() {
     let input = std::fs::read_to_string("./input.txt").expect("Error reading input file.");
 
     let mut score = 0;
@@ -76,9 +113,27 @@ fn main() {
             .map(|(l, r)| (Shape::from_str(l), Shape::from_str(r)))
             .unwrap();
 
-        println!("{:?} against {:?} = {} + {}", player, opponent, player.base_score(), player.result_against(&opponent).score());
+        // println!("{:?} against {:?} = {} + {}", player, opponent, player.base_score(), player.result_against(&opponent).score());
 
         score += player.score_against(&opponent);
+    }
+
+    println!("Result:");
+    println!("{}", score);
+}
+
+fn part_2() {
+    let input = std::fs::read_to_string("./input.txt").expect("Error reading input file.");
+
+    let mut score = 0;
+    for line in input.lines() {
+        let (opponent, expected_result) = line
+            .split_once(" ")
+            .map(|(l, r)| (Shape::from_str(l), RoundResult::from_str(r)))
+            .unwrap();
+
+        let player = opponent.get_opponent_shape(&expected_result.inverted());
+        score += player.base_score() + expected_result.score();
     }
 
     println!("Result:");
