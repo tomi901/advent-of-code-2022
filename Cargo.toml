@@ -2,3 +2,4 @@
 members = [
     "create_new_day",
 ]
+resolver = "2"
