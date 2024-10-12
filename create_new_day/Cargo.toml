@@ -7,3 +7,7 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "4.5.20", features = ["derive"] }
+color-print = "0.3.6"
+reqwest = "0.12.8"
+tokio = { version = "1.40.0", features = ["rt-multi-thread", "macros"] }
+tokio-macros = "2.4.0"
