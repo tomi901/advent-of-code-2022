@@ -2,5 +2,6 @@
 members = [
     "create_new_day",
     "day_01",
+    "day_02",
 ]
 resolver = "2"
