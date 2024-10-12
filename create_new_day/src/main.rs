@@ -1,4 +1,4 @@
-use std::{io::Cursor, process::Command};
+use std::{fs, io::Cursor, process::Command};
 use clap::Parser;
 use color_print::cprintln;
 use tokio;
@@ -25,7 +25,11 @@ async fn main() {
         .output()
         .expect("Failed to create cargo library.");
 
-    println!("📄 Downloading input...");
+    println!("📝 Preparing main.rs...");
+    fs::write(format!("{crate_name}/src/main.rs"), TEMPLATE_FILE)
+        .expect("Error writing template main.rs.");
+
+    println!("📋 Downloading input...");
     let client = reqwest::Client::new();
     let session = std::env::var("AOC_SESSION").expect("Invalid AOC_SESSION env variable.");
     let result = client.get(format!("https://adventofcode.com/{}/day/{}/input", YEAR, args.day_number))
@@ -44,3 +48,14 @@ async fn main() {
     cprintln!("🎄 <green>Done!</> Don't let Santa down and don't forget to run:");
     cprintln!("   <yellow>cd {crate_name}</>");
 }
+
+const TEMPLATE_FILE: &str = r#"
+fn main() {
+    let input = std::fs::read_to_string("./input.txt").expect("Error reading input file.");
+    for line in input.lines() {
+        // Process lines
+    }
+
+    println!("Result:");
+}
+"#;
