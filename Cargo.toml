@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "create_new_day",
+    "template",
     "day_01",
     "day_02",
 ]

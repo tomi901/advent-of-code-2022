@@ -1,4 +1,4 @@
-use std::{fs, io::Cursor, process::Command};
+use std::{io::Cursor, process::Command};
 use clap::Parser;
 use color_print::cprintln;
 use tokio;
@@ -14,6 +14,7 @@ struct Args {
 async fn main() {
     let args = Args::parse();
 
+    // TODO: Recover from these errors and delete incomplete crates
     let crate_name = format!("day_{:02}", args.day_number);
     println!("🎁 Creating crate {crate_name}...");
 
@@ -22,12 +23,23 @@ async fn main() {
         .args(["--bin", &crate_name])
         .args(["--name", &crate_name])
         .args(["--edition", "2021"])
+        // .stderr(std::io::stderr())
         .output()
         .expect("Failed to create cargo library.");
 
-    println!("📝 Preparing main.rs...");
-    fs::write(format!("{crate_name}/src/main.rs"), TEMPLATE_FILE)
-        .expect("Error writing template main.rs.");
+    // TODO: Use cross-platform code
+    println!("📝 Preparing files...");
+    Command::new("cp")
+        .args(["-a", "template/.", &crate_name])
+        .stderr(std::io::stderr())
+        .output()
+        .expect("Failed to copy contents from template.");
+
+    Command::new("sed")
+        .args(["-i", &format!(r#"s/name = "template"/name = "{}"/g"#, crate_name), &format!("./{}/Cargo.toml", crate_name)])
+        .stderr(std::io::stderr())
+        .output()
+        .expect("Failed to copy contents from template.");
 
     println!("📋 Downloading input...");
     let client = reqwest::Client::new();
@@ -48,14 +60,3 @@ async fn main() {
     cprintln!("🎄 <green>Done!</> Don't let Santa down and don't forget to run:");
     cprintln!("   <yellow>cd {crate_name}</>");
 }
-
-const TEMPLATE_FILE: &str = r#"
-fn main() {
-    let input = std::fs::read_to_string("./input.txt").expect("Error reading input file.");
-    for line in input.lines() {
-        // Process lines
-    }
-
-    println!("Result:");
-}
-"#;
