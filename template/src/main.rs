@@ -1,7 +1,5 @@
 use std::fmt::Display;
-
 use cli_clipboard::{ClipboardContext, ClipboardProvider};
-
 
 fn main() {
     part_1();
