@@ -62,7 +62,7 @@ impl CrateCollection {
 
     pub fn execute_instruction(&mut self, instruction: &Instruction) {
         for _ in 0..instruction.quantity {
-            self.move_crate(instruction.from - 1, instruction.to - 1);
+            self.move_crate(instruction.from, instruction.to);
         }
     }
     
@@ -75,6 +75,13 @@ impl CrateCollection {
         self.0.iter()
             .map(|stack| stack.last().unwrap_or(&' '))
             .collect()
+    }
+    
+    pub fn execute_instruction_9001(&mut self, instruction: &Instruction) {
+        self.execute_instruction(instruction);
+        let mut stack = &mut self.0[instruction.to];
+        let len = stack.len();
+        stack[(len - instruction.quantity)..len].reverse();
     }
 }
 
@@ -92,16 +99,16 @@ impl FromStr for Instruction {
         split.next().unwrap();
         let quantity = split.next().unwrap().parse().unwrap();
         split.next().unwrap();
-        let from = split.next().unwrap().parse().unwrap();
+        let from = split.next().unwrap().parse::<usize>().unwrap() - 1;
         split.next().unwrap();
-        let to = split.next().unwrap().parse().unwrap();
+        let to = split.next().unwrap().parse::<usize>().unwrap() - 1;
         Ok(Self { quantity, from, to })
     }
 }
 
 fn main() {
-    part_1();
-    // part_2();
+    // part_1();
+    part_2();
 }
 
 fn part_1() {
@@ -120,7 +127,18 @@ fn part_1() {
 }
 
 fn part_2() {
+    let input = std::fs::read_to_string("./input.txt").expect("Error reading input file.");
+    
+    let mut lines = input.lines();
+    let mut collection = CrateCollection::from_lines(&mut lines);
 
+    for instruction in lines.map(Instruction::from_str) {
+        let _instruction = instruction.unwrap();
+        collection.execute_instruction_9001(&_instruction);
+    }
+
+    let result = collection.top_crates();
+    display_result(&result);
 }
 
 // TODO: Move this to common library crate
