@@ -1,4 +1,4 @@
-use std::{fmt::{Debug, Display}, path::PathBuf, str::FromStr};
+use std::{fmt::{Debug, Display}, path::PathBuf, str::{FromStr, Lines}};
 use cli_clipboard::{ClipboardContext, ClipboardProvider};
 
 #[derive(Debug)]
@@ -85,6 +85,100 @@ impl Dir {
         Dir { name: name.to_string(), content: Default::default() }
     }
 
+    fn from_commands(lines: &mut Lines) -> Self {
+        let mut root_dir = Dir::new("/");
+        let mut cur_path = PathBuf::from("/"); cur_path = PathBuf::from("/");
+        
+        let mut cur_line = lines.next();
+        loop {
+            let _cur_line = match cur_line {
+                Some(l) => l,
+                None => break,
+            };
+
+            let mut split = _cur_line.split_whitespace();
+            assert_eq!(split.next(), Some("$"));
+            match split.next() {
+                Some("cd") => {
+                    // println!("{}", _cur_line);
+                    let path = split.next().expect("No path given");
+                    if path == ".." { // We could have a chain of .. paths but the challenge doesn't require it
+                        cur_path.pop();
+                    } else {
+                        cur_path.push(path);
+                    }
+                    // println!("Cur path: {:?}", cur_path);
+                },
+                Some("ls") => {
+                    // println!("{}", _cur_line);
+                    let dir = root_dir.get_dir_mut(&cur_path);
+                    loop {
+                        cur_line = lines.next();
+                        let node = match cur_line {
+                            Some(s) if s.starts_with("$") => break,
+                            Some(s) => {
+                                // println!("Found: {}", s);
+                                s.parse::<Node>().expect("Failed to parse node")
+                            },
+                            None => break,
+                        };
+                        dir.content.push(node);
+                    }
+                    continue;
+                },
+                Some(cmd) => panic!("Unrecognized command: {}", cmd),
+                None => panic!("No command given"),
+            }
+
+            cur_line = lines.next();
+        }
+        
+        let mut cur_line = lines.next();
+        loop {
+            let _cur_line = match cur_line {
+                Some(l) => l,
+                None => break,
+            };
+
+            let mut split = _cur_line.split_whitespace();
+            assert_eq!(split.next(), Some("$"));
+            match split.next() {
+                Some("cd") => {
+                    // println!("{}", _cur_line);
+                    let path = split.next().expect("No path given");
+                    if path == ".." { // We could have a chain of .. paths but the challenge doesn't require it
+                        cur_path.pop();
+                    } else {
+                        cur_path.push(path);
+                    }
+                    // println!("Cur path: {:?}", cur_path);
+                },
+                Some("ls") => {
+                    // println!("{}", _cur_line);
+                    let dir = root_dir.get_dir_mut(&cur_path);
+                    loop {
+                        cur_line = lines.next();
+                        let node = match cur_line {
+                            Some(s) if s.starts_with("$") => break,
+                            Some(s) => {
+                                // println!("Found: {}", s);
+                                s.parse::<Node>().expect("Failed to parse node")
+                            },
+                            None => break,
+                        };
+                        dir.content.push(node);
+                    }
+                    continue;
+                },
+                Some(cmd) => panic!("Unrecognized command: {}", cmd),
+                None => panic!("No command given"),
+            }
+
+            cur_line = lines.next();
+        }
+        root_dir
+    }
+
     fn total_size(&self) -> u64 {
         self.content.iter().map(Node::total_size).sum()
     }
@@ -128,6 +222,24 @@ impl Dir {
             .sum::<u64>();
         total_size
     }
+
+    fn get_smallest_deletable_size(&self, limit: u64) -> Option<u64> {
+        self.get_smallest_deletable_size_with_min(limit, None)
+    }
+
+    fn get_smallest_deletable_size_with_min(&self, limit: u64, min: Option<u64>) -> Option<u64> {
+        let self_size = self.total_size();
+        let mut current_min = min;
+        if self_size >= limit && (current_min.is_none() || current_min.is_some_and(|min| self_size < min)) {
+            println!("Found dir {} of size {}", self.name, self_size);
+            current_min = Some(self_size);
+        }
+
+        for dir in self.content.iter().flat_map(Node::as_dir) {
+            current_min = dir.get_smallest_deletable_size_with_min(limit, min);
+        }
+        current_min
+    }
 }
 
 impl Display for Dir {
@@ -138,60 +250,13 @@ impl Display for Dir {
 }
 
 fn main() {
-    part_1();
-    // part_2();
+    // part_1();
+    part_2();
 }
 
 fn part_1() {
     let input = std::fs::read_to_string("./input.txt").expect("Error reading input file.");
-
-    let mut root_dir = Dir::new("/");
-    let mut cur_path = PathBuf::from("/");
-    
-    let mut lines = input.lines();
-    let mut cur_line = lines.next();
-    loop {
-        let _cur_line = match cur_line {
-            Some(l) => l,
-            None => break,
-        };
-
-        let mut split = _cur_line.split_whitespace();
-        assert_eq!(split.next(), Some("$"));
-        match split.next() {
-            Some("cd") => {
-                // println!("{}", _cur_line);
-                let path = split.next().expect("No path given");
-                if path == ".." { // We could have a chain of .. paths but the challenge doesn't require it
-                    cur_path.pop();
-                } else {
-                    cur_path.push(path);
-                }
-                // println!("Cur path: {:?}", cur_path);
-            },
-            Some("ls") => {
-                // println!("{}", _cur_line);
-                let dir = root_dir.get_dir_mut(&cur_path);
-                loop {
-                    cur_line = lines.next();
-                    let node = match cur_line {
-                        Some(s) if s.starts_with("$") => break,
-                        Some(s) => {
-                            // println!("Found: {}", s);
-                            s.parse::<Node>().expect("Failed to parse node")
-                        },
-                        None => break,
-                    };
-                    dir.content.push(node);
-                }
-                continue;
-            },
-            Some(cmd) => panic!("Unrecognized command: {}", cmd),
-            None => panic!("No command given"),
-        }
-
-        cur_line = lines.next();
-    }
+    let root_dir = Dir::from_commands(&mut input.lines());
 
     // println!("Folder structure:");
     // println!("{}", &root_dir);
@@ -201,13 +266,27 @@ fn part_1() {
 }
 
 fn part_2() {
+    let input = std::fs::read_to_string("./input.txt").expect("Error reading input file.");
+    let root_dir = Dir::from_commands(&mut input.lines());
 
+    const TOTAL_SIZE: u64 = 70_000_000;
+    const REQUIRED_SIZE: u64 = 30_000_000;
+    let occupied = root_dir.total_size();
+    let current_free = TOTAL_SIZE - occupied;
+    let to_delete: u64 = REQUIRED_SIZE - current_free;
+
+    println!("{} bytes occupied", occupied);
+    println!("{} bytes free", current_free);
+    println!("{} to delete", to_delete);
+
+    let result = root_dir.get_smallest_deletable_size(to_delete);
+    display_result(&result);
 }
 
 // TODO: Move this to common library crate
-fn display_result<T: Display>(result: &T) {
+fn display_result<T: Debug>(result: &T) {
     println!("Result:");
-    let str_result = format!("{}", result);
+    let str_result = format!("{:?}", result);
     println!("{}", &str_result);
 
     let mut clipboard = ClipboardContext::new().unwrap();
