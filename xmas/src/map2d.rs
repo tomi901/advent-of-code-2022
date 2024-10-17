@@ -3,6 +3,7 @@ use thiserror::Error;
 
 use crate::point2d::Point2D;
 
+#[derive(Debug, PartialEq)]
 pub struct Map2D {
     map: Vec<u8>,
     width: usize,
@@ -53,7 +54,7 @@ impl Map2D {
     }
 
     pub fn get_index(&self, point: Point2D) -> Option<usize> {
-        self.is_inside(point).then(|| point.0 as usize + (point.1 as usize * self.height))
+        self.is_inside(point).then(|| point.0 as usize + (point.1 as usize * self.width))
     }
 
     pub fn iter_points(&self) -> impl Iterator<Item = Point2D> + '_ {
@@ -66,7 +67,7 @@ impl Map2D {
     }
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq, Eq)]
 pub enum ParseMapError {
     #[error("Can't parse an empty string to a Map2D")]
     EmptyString,
@@ -101,6 +102,7 @@ impl FromStr for Map2D {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rstest::rstest;
 
     #[test]
     fn builds_map_correctly() {
@@ -109,5 +111,54 @@ mod tests {
         assert_eq!(map.width, 20);
         assert_eq!(map.height, 10);
         assert_eq!(map.map.len(), 20 * 10);
+    }
+
+    #[rstest]
+    #[case(Point2D(20, 10), Point2D(0, 0), Some(0))]
+    #[case(Point2D(20, 10), Point2D(4, 5), Some(104))]
+    #[case(Point2D(20, 10), Point2D(-1, 0), None)]
+    #[case(Point2D(20, 10), Point2D(0, -1), None)]
+    #[case(Point2D(20, 10), Point2D(20, 0), None)]
+    #[case(Point2D(20, 10), Point2D(0, 10), None)]
+    fn index_is_equal_to_expected(
+        #[case] map_size: Point2D,
+        #[case] point: Point2D,
+        #[case] expected: Option<usize>,
+    ) {
+        let map = Map2D::new_with_default_tiles(map_size);
+        let index = map.get_index(point);
+
+        assert_eq!(index, expected);
+    }
+
+    #[test]
+    fn parses_map_correctly() {
+        const MAP: &str = concat!(
+            "0123\n",
+            "4567\n",
+            "89AB\n",
+        );
+
+        let map = Map2D::from_str(MAP).unwrap();
+        assert_eq!(map.width, 4);
+        assert_eq!(map.height, 3);
+    }
+
+    #[test]
+    fn parse_map_returns_empty_error() {
+        let result = Map2D::from_str("");
+        assert_eq!(result, Err(ParseMapError::EmptyString));
+    }
+
+    #[test]
+    fn parse_map_returns_inconsistent_lines_error() {
+        const MAP: &str = concat!(
+            "0123\n",
+            "457\n",
+            "89AB\n",
+        );
+
+        let result = Map2D::from_str(MAP);
+        assert_eq!(result, Err(ParseMapError::InconsistentRowSize { current: 3, expected: 4 }))
     }
 }
