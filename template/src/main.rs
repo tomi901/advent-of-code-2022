@@ -1,9 +1,8 @@
-use std::fmt::Display;
-use cli_clipboard::{ClipboardContext, ClipboardProvider};
+use xmas::display_result;
 
 fn main() {
     part_1();
-    // part_2();
+    part_2();
 }
 
 fn part_1() {
@@ -17,16 +16,5 @@ fn part_1() {
 }
 
 fn part_2() {
-
-}
-
-// TODO: Move this to common library crate
-fn display_result<T: Display>(result: &T) {
-    println!("Result:");
-    let str_result = format!("{}", result);
-    println!("{}", &str_result);
-
-    let mut clipboard = ClipboardContext::new().unwrap();
-    clipboard.set_contents(str_result.clone()).unwrap();
-    println!("Copied result to clipboard!");
+    
 }
