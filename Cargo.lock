@@ -307,6 +307,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "day_08"
+version = "0.1.0"
+dependencies = [
+ "cli-clipboard",
+]
+
+[[package]]
 name = "derive-new"
 version = "0.5.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
