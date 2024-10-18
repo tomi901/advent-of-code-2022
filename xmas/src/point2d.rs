@@ -4,6 +4,10 @@ use std::{fmt::Display, ops};
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Hash)]
 pub struct Point2D(pub isize, pub isize);
 
+impl Point2D {
+    pub const ZERO: Self = Point2D(0, 0);
+}
+
 impl Display for Point2D {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "({}, {})", self.0, self.1)
