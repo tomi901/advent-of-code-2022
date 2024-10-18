@@ -21,6 +21,10 @@ impl Direction {
             West => Point2D(-1, 0),
         }
     }
+
+    pub fn combined(&self, other: Self) -> Point2D {
+        self.as_point() + other.as_point()
+    }
 }
 
 impl From<Direction> for Point2D {
