@@ -115,5 +115,25 @@ fn part_1() {
 }
 
 fn part_2() {
+    let input = std::fs::read_to_string("./input.txt").expect("Error reading input file.");
+    let instructions = input.lines().map(Instruction::from_str).collect::<Result<Vec<_>, _>>().unwrap();
     
+    const WIDTH: u64 = 40;
+    const HEIGHT: u64 = 6;
+    const SPRITE_WIDTH: u64 = 1;
+    let mut render = String::with_capacity((WIDTH * HEIGHT + HEIGHT) as usize);
+
+    let mut x_pos: u64 = 0;
+    for state in CPUExecution::new(instructions.into_iter()) {
+        let draw = state.reg_x.abs_diff(x_pos as i64) <= SPRITE_WIDTH;
+        render.push(if draw { '#' } else { '.' });
+
+        x_pos += 1;
+        if x_pos >= WIDTH {
+            x_pos = 0;
+            render.push('\n');
+        }
+    }
+
+    display_result(&render);
 }
