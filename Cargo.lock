@@ -338,6 +338,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "day_10"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "xmas",
+]
+
+[[package]]
 name = "derive-new"
 version = "0.5.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
