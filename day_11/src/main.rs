@@ -1,9 +1,12 @@
-use std::{cmp::Reverse, num::ParseIntError, str::FromStr};
+use num::integer::lcm;
+use std::{cmp::Reverse, num::ParseIntError, ops::Mul, str::FromStr};
 use xmas::display_result;
+
+type Item = u64;
 
 #[derive(Debug, Clone, Copy)]
 enum Value {
-    Literal(u64),
+    Literal(Item),
     Old,
 }
 
@@ -19,7 +22,7 @@ impl FromStr for Value {
 }
 
 impl Value {
-    pub fn eval(&self, old: u64) -> u64 {
+    pub fn eval(&self, old: Item) -> Item {
         match self {
             Value::Literal(i) => *i,
             Value::Old => old,
@@ -47,7 +50,7 @@ impl FromStr for Operation {
 }
 
 impl Operation {
-    pub fn apply(&self, old: u64) -> u64 {
+    pub fn apply(&self, old: Item) -> Item {
         match self {
             Operation::Add(value) => old + value.eval(old),
             Operation::Multiply(value) => old * value.eval(old),
@@ -57,12 +60,12 @@ impl Operation {
 
 #[derive(Debug, Clone)]
 struct Monkey {
-    items: Vec<u64>,
+    items: Vec<Item>,
     operation: Operation,
-    divisible_test: u64,
+    divisible_test: Item,
     on_true_pass_to: usize,
     on_false_pass_to: usize,
-    inspection_count: u32,
+    inspection_count: u64,
 }
 
 impl Monkey {
@@ -80,7 +83,7 @@ impl Monkey {
             .trim_start_matches(STARTING_ITEMS)
             .split(',')
             .map(str::trim)
-            .map(str::parse::<u64>)
+            .map(str::parse::<Item>)
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
 
@@ -93,7 +96,7 @@ impl Monkey {
         let divisible_test = lines.next()
             .and_then(|l| l.split_whitespace().last())
             .unwrap()
-            .parse::<u64>()
+            .parse::<Item>()
             .unwrap();
 
         let on_true_pass_to = lines.next()
@@ -117,12 +120,24 @@ impl Monkey {
             inspection_count: 0,
         })
     }
+
+    pub fn calculate_throw_with_decay(&self, item: Item, worry_decay: Item) -> Throw {
+        let new_value = self.operation.apply(item) / worry_decay;
+        Throw { item: new_value, to: self.get_target(new_value % self.divisible_test == 0) }
+    }
+
+    pub fn get_target(&self, condition: bool) -> usize {
+        if condition { self.on_true_pass_to } else { self.on_false_pass_to }
+    }
 }
 
 #[derive(Debug, Clone)]
 struct MonkeyGroup {
-    rounds: u32,
     monkeys: Vec<Monkey>,
+    rounds: u32,
+    // Needed to limit the max number and avoid overflows
+    // Altough all numbers are primes, so we could've just used a simple mul instead of num::lcm
+    lcm: Item,
 }
 
 impl FromStr for MonkeyGroup {
@@ -137,13 +152,17 @@ impl FromStr for MonkeyGroup {
             }
             monkeys
         };
-        Ok(Self { monkeys, rounds: 0 })
+        Ok(MonkeyGroup::new(monkeys))
     }
 }
 
 impl MonkeyGroup {
-    pub fn play_round(&mut self) {
-        const WORRY_DECAY: u64 = 3;
+    pub fn new(monkeys: Vec<Monkey>) -> Self {
+        let lcm = monkeys.iter().map(|m| m.divisible_test).reduce(lcm).unwrap();
+        Self { monkeys, rounds: 0, lcm }
+    }
+
+    pub fn play_round(&mut self, worry_decay: Item) {
         self.rounds += 1;
         for i in 0..(self.monkeys.len()) {
             let throws = {
@@ -151,17 +170,10 @@ impl MonkeyGroup {
                 let throws = monkey.items
                     .iter()
                     .cloned()
-                    .map(|item| monkey.operation.apply(item) / WORRY_DECAY)
-                    .map(|item| {
-                        let to = if item % monkey.divisible_test == 0 {
-                            monkey.on_true_pass_to
-                        } else {
-                            monkey.on_false_pass_to
-                        };
-                        Throw { item, to }
-                    })
+                    .map(|item| monkey.calculate_throw_with_decay(item, worry_decay))
+                    .map(|throw| Throw { item: throw.item % self.lcm, ..throw })
                     .collect::<Vec<_>>();
-                monkey.inspection_count += monkey.items.len() as u32;
+                monkey.inspection_count += monkey.items.len() as u64;
                 monkey.items.clear();
                 throws
             };
@@ -172,7 +184,7 @@ impl MonkeyGroup {
         }
     }
 
-    pub fn monkey_business_level(&self) -> u32 {
+    pub fn monkey_business_level(&self) -> u64 {
         // We can optimize this, but let's skip it for now
         let mut levels = self.monkeys.iter()
             .map(|m| m.inspection_count)
@@ -184,12 +196,12 @@ impl MonkeyGroup {
 }
 
 struct Throw {
-    item: u64,
+    item: Item,
     to: usize,
 }
 
 fn main() {
-    part_1();
+    // part_1();
     part_2();
 }
 
@@ -197,7 +209,7 @@ fn part_1() {
     let input = std::fs::read_to_string("./input.txt").expect("Error reading input file.");
     let mut monkeys = MonkeyGroup::from_str(&input).unwrap();
     for _ in 0..20 {
-        monkeys.play_round();
+        monkeys.play_round(3);
     }
     // println!("{:#?}", monkeys);
 
@@ -206,5 +218,15 @@ fn part_1() {
 }
 
 fn part_2() {
-    
+    let input = std::fs::read_to_string("./input.txt").expect("Error reading input file.");
+    let mut monkeys = MonkeyGroup::from_str(&input).unwrap();
+    println!("LCM: {}", monkeys.lcm);
+    println!("Mul: {}", monkeys.monkeys.iter().map(|m| m.divisible_test).reduce(Mul::mul).unwrap());
+    for _ in 0..10_000 {
+        monkeys.play_round(1);
+    }
+    // println!("{:#?}", monkeys);
+
+    let result = monkeys.monkey_business_level();
+    display_result(&result);
 }
