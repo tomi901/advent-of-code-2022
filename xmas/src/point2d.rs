@@ -6,6 +6,18 @@ pub struct Point2D(pub isize, pub isize);
 
 impl Point2D {
     pub const ZERO: Self = Point2D(0, 0);
+
+    pub fn manhattan_magnitude(&self) -> usize {
+        self.0.unsigned_abs() + self.1.unsigned_abs()
+    }
+
+    pub fn manhattan_distance(&self, towards: Point2D) -> usize {
+        (*self - towards).manhattan_magnitude()
+    }
+
+    pub fn sqr_magnitude(&self) -> usize {
+        (self.0 * self.0 + self.1 * self.1) as usize
+    }
 }
 
 impl Display for Point2D {
