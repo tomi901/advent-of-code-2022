@@ -137,6 +137,7 @@ impl Ord for Packet {
 
 fn main() -> anyhow::Result<()> {
     part_1()?;
+    println!();
     part_2()?;
     Ok(())
 }
@@ -193,6 +194,33 @@ fn part_1() -> anyhow::Result<()> {
 
 fn part_2() -> anyhow::Result<()> {
     println!("Part 2:");
+    let input = std::fs::read_to_string("./input.txt").context("Error reading input file.")?;
 
+    let mut packets = input.lines()
+        .filter(|s| !s.is_empty())
+        .map(Packet::from_str)
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let packet_1 = Packet::from_str("[[2]]")?;
+    let packet_2 = Packet::from_str("[[6]]")?;
+
+    packets.push(packet_1.clone());
+    packets.push(packet_2.clone());
+
+    packets.sort();
+
+    let packet_1_index = packets.iter().position(|p| p == &packet_1).unwrap() + 1;
+    let packet_2_index = packets.iter().position(|p| p == &packet_2).unwrap() + 1;
+
+    // for (i, packet) in packets.iter().enumerate() {
+    //     print!("{packet}");
+    //     if packet == &packet_1 || packet == &packet_2 {
+    //         print!(" <---- {}", i + 1);
+    //     }
+    //     println!();
+    // }
+
+    let result = packet_1_index * packet_2_index;
+    display_result(&result);
     Ok(())
 }
