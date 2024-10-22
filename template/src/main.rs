@@ -3,6 +3,7 @@ use xmas::display_result;
 
 fn main() -> anyhow::Result<()> {
     part_1()?;
+    println!();
     part_2()?;
     Ok(())
 }
