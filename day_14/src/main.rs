@@ -1,6 +1,6 @@
-use std::{any, iter, str::FromStr};
+use std::{collections::HashMap, iter, str::FromStr};
 
-use anyhow::{anyhow, Context};
+use anyhow::Context;
 use xmas::{display_result, map2d::Map2D, point2d::Point2D};
 
 struct Line(Vec<Point2D>);
@@ -130,7 +130,7 @@ impl CaveMap {
             // return Err(anyhow!("Couldn't mark sand source point {}", sand_source));
         }
 
-        println!("Created map with size {}, min: {}, max: {}", size, min, max);
+        // println!("Created map with size {}, min: {}, max: {}", size, min, max);
         // println!("{}", map);
 
         Ok(Self { map, sand_source })
@@ -174,6 +174,69 @@ impl CaveMap {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Tile {
+    Rock,
+    Sand,
+}
+
+struct CaveHashMap {
+    tiles: HashMap<Point2D, Tile>,
+    floor: isize,
+}
+
+impl CaveHashMap {
+    pub fn new(lines: Vec<Line>) -> Self {
+        let mut tiles = HashMap::new();
+        let mut floor = 0;
+        for point in lines.iter().flat_map(Line::points) {
+            tiles.insert(point, Tile::Rock);
+            floor = floor.max(point.1);
+        }
+        floor += 2;
+        Self { tiles, floor }
+    }
+
+    pub fn spawn_sand(&mut self) -> bool {
+        if self.check_collision(CaveMap::SAND_SOURCE) {
+            return false;
+        }
+
+        let mut position = CaveMap::SAND_SOURCE;
+        const CHECK_POINTS: [Point2D; 3] = [Point2D(0, 1), Point2D(-1, 1), Point2D(1, 1)];
+
+        loop {
+            let mut did_move = false;
+            for check_point in CHECK_POINTS.map(|p| position + p) {
+                if check_point.1 < self.floor && !self.check_collision(check_point) {
+                    position = check_point;
+                    did_move = true;
+                    break;
+                }
+            }
+
+            if !did_move {
+                self.tiles.insert(position, Tile::Sand);
+                // println!("Positioned sand at: {}", position);
+                return true;
+            }
+        }
+    }
+
+    fn check_collision(&self, point: Point2D) -> bool {
+        self.tiles.contains_key(&point)
+    }
+}
+
+impl FromStr for CaveHashMap {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let lines = s.lines().map(Line::from_str).collect::<Result<Vec<_>, _>>()?;
+        Ok(Self::new(lines))
+    }
+}
+
 fn main() -> anyhow::Result<()> {
     part_1()?;
     println!();
@@ -201,5 +264,14 @@ fn part_1() -> anyhow::Result<()> {
 fn part_2() -> anyhow::Result<()> {
     println!("Part 2:");
 
+    let input = std::fs::read_to_string("./input.txt").context("Error reading input file.")?;
+    let mut map = CaveHashMap::from_str(&input)?;
+
+    let mut result = 0;
+    while map.spawn_sand() {
+        result += 1;
+    }
+
+    display_result(&result);
     Ok(())
 }
