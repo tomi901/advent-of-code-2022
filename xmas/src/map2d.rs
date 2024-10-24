@@ -1,4 +1,5 @@
-use std::str::FromStr;
+use core::str;
+use std::{fmt::Display, str::FromStr};
 use thiserror::Error;
 
 use crate::point2d::Point2D;
@@ -11,15 +12,19 @@ pub struct Map2D {
 }
 
 impl Map2D {
-    pub fn new_with_default_tiles(size: Point2D) -> Self {
+    pub fn new_filled(size: Point2D, tile: u8) -> Self {
         let width = size.0 as usize;
         let height = size.1 as usize;
-        let map = vec![Default::default(); width * height];
+        let map = vec![tile; width * height];
         Self {
             map,
             width,
             height,
         }
+    }
+
+    pub fn new_with_default_tiles(size: Point2D) -> Self {
+        Self::new_filled(size, Default::default())
     }
 
     pub fn parse_and_add_row(&mut self, line: &str) -> Result<(), ParseMapError> {
@@ -96,6 +101,19 @@ impl FromStr for Map2D {
         }
 
         Ok(map)
+    }
+}
+
+impl Display for Map2D {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let lines = (0..self.height).map(|y| {
+            let from = y * self.width;
+            &self.map[from..(from + self.width)]
+        });
+        for line in lines {
+            writeln!(f, "{}", String::from_utf8_lossy(line))?;
+        }
+        Ok(())
     }
 }
 

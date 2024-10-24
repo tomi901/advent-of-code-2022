@@ -1,5 +1,5 @@
 use std::{fmt::Display, ops};
-
+use crate::direction::Direction;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Hash)]
 pub struct Point2D(pub isize, pub isize);
@@ -17,6 +17,27 @@ impl Point2D {
 
     pub fn sqr_magnitude(&self) -> usize {
         (self.0 * self.0 + self.1 * self.1) as usize
+    }
+
+    pub fn max(&self, other: Self) -> Self {
+        Point2D(self.0.max(other.0), self.1.max(other.1))
+    }
+
+    pub fn min(&self, other: Self) -> Self {
+        Point2D(self.0.min(other.0), self.1.min(other.1))
+    }
+
+    pub fn try_get_direction(&self) -> Option<(Direction, usize)> {
+        match self {
+            Point2D(0, 0) => None,
+            Point2D(0, y) => Some((if *y > 0 { Direction::South } else { Direction::North }, y.unsigned_abs())),
+            Point2D(x, 0) => Some((if *x > 0 { Direction::East } else { Direction::West }, x.unsigned_abs())),
+            _ => None,
+        }
+    }
+
+    pub fn try_get_direction_towards(&self, target: Point2D) -> Option<(Direction, usize)> {
+        (target - *self).try_get_direction()
     }
 }
 
