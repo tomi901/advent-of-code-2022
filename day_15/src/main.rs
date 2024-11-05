@@ -1,4 +1,4 @@
-use std::{ops::RangeInclusive, str::FromStr};
+use std::{collections::HashSet, ops::RangeInclusive, str::FromStr};
 
 use anyhow::{self, Context};
 use xmas::{display_result, point2d::Point2D};
@@ -25,7 +25,59 @@ impl Sensor {
         }
 
         let extend = distance - y_diff;
+        // println!("Row {y}: Point {} extends {extend} (Distance: {})", self.position, self.distance_to_beacon());
         Some((self.position.0 - extend as isize)..=(self.position.0 + extend as isize))
+    }
+
+    fn does_triangulate(&self, other: &Self) -> bool {
+        let distance = self.position.manhattan_distance(other.position);
+        let expected_distance = self.distance_to_beacon() + other.distance_to_beacon() + 1;
+        if distance.abs_diff(expected_distance) <= 2 {
+            println!("{} -> {}, distance: {}, expected: {}", self.position, other.position, distance, expected_distance);
+        }
+        distance == expected_distance
+    }
+
+    fn get_positions_at_distance(&self, distance: usize) -> impl Iterator<Item = Point2D> + '_ {
+        const STAGES: [Point2D; 4] = [Point2D(1, 1), Point2D(-1, 1), Point2D(-1, -1), Point2D(1, -1)];
+
+        // println!("Getting positions for {} at distance {}", self.position, distance);
+
+        let starting_position = self.position + Point2D(0, -(distance as isize));
+        let mut cur_pos = starting_position;
+        let mut stage = 0;
+        let mut amount = 0;
+        std::iter::from_fn(move || {
+            if stage >= STAGES.len() {
+                return None;
+            }
+
+            if distance == 0 {
+                stage = STAGES.len();
+                return Some(starting_position);
+            }
+
+            let pos = cur_pos;
+            let move_towards = STAGES[stage];
+            cur_pos += move_towards;
+            amount += 1;
+            if amount >= distance {
+                amount = 0;
+                stage += 1;
+            }
+
+            // println!(" - Position {}", pos);
+            Some(pos)
+        })
+    }
+
+    fn get_outer_positions(&self) -> impl Iterator<Item = Point2D> + '_ {
+        self.get_positions_at_distance(self.distance_to_beacon() + 1)
+    }
+    
+    fn is_in_range(&self, point: Point2D) -> bool {
+        let distance = self.position.manhattan_distance(point);
+        distance <= self.distance_to_beacon()
     }
 }
 
@@ -61,6 +113,7 @@ fn part_1() -> anyhow::Result<()> {
     // println!("{:#?}", sensors);
 
     const CHECK_ROW: isize = 2_000_000;
+    // const CHECK_ROW: isize = 10;
     let result = get_non_beacon_count(&sensors, CHECK_ROW);
 
     display_result(&result);
@@ -101,23 +154,59 @@ fn get_ranges_at_row(sensors: &Vec<Sensor>, row: isize) -> impl Iterator<Item = 
 }
 
 fn find_beacon_space(sensors: &Vec<Sensor>) -> Option<Point2D> {
-    const FROM: isize = 0;
-    const TO: isize = 4_000_000;
+    const RANGE: RangeInclusive<isize> = 0..=4_000_000;
 
-    for y in FROM..=TO {
-        let ranges = get_ranges_at_row(&sensors, y).collect::<Vec<_>>();
+    for row in RANGE {
+        let mut ranges = get_ranges_at_row(sensors, row).collect::<Vec<_>>();
+        ranges.sort_by_key(|r| *r.start());
 
-        let min = ranges.iter().map(|r| *r.start()).min().unwrap();
-        let max = ranges.iter().map(|r| *r.end()).max().unwrap();
+        // println!("Pre-proccessed ranges:");
+        // println!("{:?}", ranges);
 
-        // println!("Searching {y} [{min}, {max}]");
+        let mut merge_index = if ranges.len() >= 2 { ranges.len() - 2 } else { 0 };
+        loop {
+            if ranges.len() < 2 {
+                break;
+            }
 
-        for x in (FROM.max(min))..=(TO.min(max)) {
-            if !ranges.iter().any(|r| r.contains(&x)) {
-                return Some(Point2D(x, y));
+            let lhs = ranges[merge_index].clone();
+            let rhs = ranges[merge_index + 1].clone();
+            if let Some(new_range) = try_merge_ranges(lhs, rhs) {
+                ranges.remove(merge_index + 1);
+                ranges[merge_index] = new_range;
+                if ranges.len() < 2 {
+                    break;
+                }
+                merge_index = ranges.len() - 2;
+            } else if merge_index > 0 {
+                merge_index -= 1;
+            } else {
+                break;
             }
         }
-    }
 
+        if ranges.len() == 2 && ranges[0].end().abs_diff(*ranges[1].start()) == 2 {
+            let found = Point2D(*ranges[0].end() + 1, row);
+            println!("Found point at: {}", found);
+            println!("Ranges:");
+            println!("{:?}", ranges);
+            return Some(found);
+        }
+    }
     None
+}
+
+fn try_merge_ranges(lhs: RangeInclusive<isize>, rhs: RangeInclusive<isize>) -> Option<RangeInclusive<isize>> {
+    let (smaller, greater) = if lhs.start() <= rhs.start() {
+        (&lhs, &rhs)
+    } else {
+        (&rhs, &lhs)
+    };
+    if smaller.contains(greater.start()) {
+        let new_range = *smaller.start()..=*smaller.end().max(greater.end());
+        // println!("Trying to merge: {:?} and {:?} = {:?}", lhs, rhs, new_range);
+        Some(new_range)
+    } else {
+        None
+    }
 }
