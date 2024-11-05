@@ -61,24 +61,63 @@ fn part_1() -> anyhow::Result<()> {
     // println!("{:#?}", sensors);
 
     const CHECK_ROW: isize = 2_000_000;
-    let ranges = sensors
-        .iter()
-        .flat_map(|s| s.get_range_at_row(CHECK_ROW))
-        .collect::<Vec<_>>();
+    let result = get_non_beacon_count(&sensors, CHECK_ROW);
 
-    let min = ranges.iter().map(|r| *r.start()).min().unwrap();
+    display_result(&result);
+    Ok(())
+}
+
+fn get_non_beacon_count(sensors: &Vec<Sensor>, row: isize) -> usize {
+    let ranges = get_ranges_at_row(&sensors, row).collect::<Vec<_>>();
+
+    let min = match ranges.iter().map(|r| *r.start()).min() {
+        Some(i) => i,
+        None => return 0,
+    };
     let max = ranges.iter().map(|r| *r.end()).max().unwrap();
     
     let result = (min..=max)
         .filter(|i| ranges.iter().any(|r| r.contains(i)))
         .count() - 1;
 
-    display_result(&result);
-    Ok(())
+    result
 }
 
 fn part_2() -> anyhow::Result<()> {
     println!("Part 2:");
+    let input = std::fs::read_to_string("./input.txt").context("Error reading input file.")?;
 
+    let sensors = input.lines().map(Sensor::from_str).collect::<Result<Vec<_>, _>>()?;
+    let space = find_beacon_space(&sensors).expect("No beacon space found");
+
+    let result = space.0 * 4000000 + space.1;
+
+    display_result(&result);
     Ok(())
+}
+
+fn get_ranges_at_row(sensors: &Vec<Sensor>, row: isize) -> impl Iterator<Item = RangeInclusive<isize>> + '_ {
+    sensors.iter().flat_map(move |s| s.get_range_at_row(row))
+}
+
+fn find_beacon_space(sensors: &Vec<Sensor>) -> Option<Point2D> {
+    const FROM: isize = 0;
+    const TO: isize = 4_000_000;
+
+    for y in FROM..=TO {
+        let ranges = get_ranges_at_row(&sensors, y).collect::<Vec<_>>();
+
+        let min = ranges.iter().map(|r| *r.start()).min().unwrap();
+        let max = ranges.iter().map(|r| *r.end()).max().unwrap();
+
+        // println!("Searching {y} [{min}, {max}]");
+
+        for x in (FROM.max(min))..=(TO.min(max)) {
+            if !ranges.iter().any(|r| r.contains(&x)) {
+                return Some(Point2D(x, y));
+            }
+        }
+    }
+
+    None
 }
