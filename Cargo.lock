@@ -398,6 +398,7 @@ dependencies = [
  "anyhow",
  "regex_static",
  "xmas",
+ "yield-return",
 ]
 
 [[package]]
@@ -2243,6 +2244,12 @@ name = "xml-rs"
 version = "0.8.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "af4e2e2f7cba5a093896c1e150fbfe177d1883e7448200efb81d40b9d339ef26"
+
+[[package]]
+name = "yield-return"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2e97c5a648a5714035620e67323ecf083f5b4a9f450cb9960b570a64f5733e11"
 
 [[package]]
 name = "zeroize"

@@ -7,3 +7,4 @@ edition = "2021"
 anyhow = "1.0.89"
 regex_static = "0.1.1"
 xmas = { version = "0.1.0", path = "../xmas" }
+yield-return = "0.1.0"
