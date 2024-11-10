@@ -1,4 +1,4 @@
-use std::{cmp::max, collections::HashSet, str::FromStr};
+use std::{cmp::max, collections::HashSet, ops::{Range, RangeInclusive}, str::FromStr};
 
 use anyhow::{self, Context};
 use xmas::{display_result, point2d::Point2D};
@@ -178,6 +178,7 @@ impl RockFormation {
         let shape = &self.shapes[self.use_shape];
         let position = Point2D(LEFT_MARGIN, self.height as isize + LOWER_MARGIN + shape.height as isize);
         let mut rock = RockInstance { shape, position };
+        let use_stream_at_start = self.use_stream;
         
         // println!("Spawned rock[{}] @ {}", self.use_shape, position);
         loop {
@@ -201,6 +202,9 @@ impl RockFormation {
             let gravity_moved_rock = rock.move_towards(Point2D(0, -1));
             if gravity_moved_rock.check_collision(self) {
                 // println!("Ground hit!");
+                // if use_stream_at_start == 0 && self.use_shape == 0 {
+                //     println!("Placed rock[0] @ {}", rock.position);
+                // }
                 break;
             } else {
                 rock = gravity_moved_rock;
@@ -217,8 +221,14 @@ impl RockFormation {
         8 // Hardcoded
     }
 
-    pub fn display_debug(&self) {
-        for y in (1..=(self.height as isize)).rev() {
+    pub fn display_debug(&self, range: Option<RangeInclusive<isize>>) {
+        let corrected_range = match range {
+            Some(_range) => _range,
+            None => 1..=(self.height as isize),
+        };
+        let bottom = *corrected_range.start();
+
+        for y in corrected_range.rev() {
             print!("|");
             for x in 1..self.right_wall() {
                 let point = Point2D(x, y);
@@ -231,11 +241,13 @@ impl RockFormation {
             println!("|");
         }
 
-        print!("+");
-        for _ in 1..self.right_wall() {
-            print!("-");
+        if bottom <= 1 {
+            print!("+");
+            for _ in 1..self.right_wall() {
+                print!("-");
+            }
+            println!("+");
         }
-        println!("+");
     }
 }
 
@@ -264,6 +276,90 @@ fn part_1() -> anyhow::Result<()> {
 
 fn part_2() -> anyhow::Result<()> {
     println!("Part 2:");
+    let input = std::fs::read_to_string("./input.txt").context("Error reading input file.")?;
 
+    let pattern = StreamDirection::pattern_from_str(&input)?;
+    let mut formation = RockFormation::new(pattern);
+
+    let factor = formation.stream_pattern.len() * formation.shapes.len();
+    println!("Factor is: {} * {} = {factor}", formation.stream_pattern.len(), formation.shapes.len());
+
+    let mut last_height = formation.height;
+    let mut deltas = vec![];
+    for _ in 1..=factor {
+        formation.throw_rock();
+        // println!("Height delta is: {} - {} = {}", formation.height, last_height, formation.height - last_height);
+        // println!("{}", formation.height - last_height);
+        deltas.push(formation.height - last_height);
+        last_height = formation.height;
+    }
+
+    const SMALLEST_RANGE: usize = 15;
+    let pattern_range = find_loop(&deltas, SMALLEST_RANGE).context("No delta pattern found!")?;
+    println!("Pattern found: {:?} out of {} deltas", pattern_range, deltas.len());
+    // println!("{:?}", &deltas[pattern_range]);
+
+    const ROCKS: usize = 1_000_000_000_000;
+    let result = calculate_sum(
+        &deltas[..pattern_range.start],
+        &deltas[pattern_range],
+        ROCKS,
+    );
+
+    // 1514285714288
+    // 714285714300
+
+    display_result(&result);
     Ok(())
+}
+
+fn calculate_sum(prepattern: &[usize], pattern: &[usize], count: usize) -> usize {
+    if count < prepattern.len() {
+        return prepattern[..count].iter().sum();
+    }
+
+    let presum: usize = prepattern.iter().sum();
+    println!("Presum is {}, {} element/s taken", presum, prepattern.len());
+
+    let patterned_count = count - prepattern.len();
+    let pattern_sum: usize = pattern.iter().sum();
+    let pattern_repeats = patterned_count / pattern.len();
+    let pattern_leftover = patterned_count % pattern.len();
+    println!("Pattern repeats {} time/s ({} height each) and {} element/s are leftover", pattern_repeats, pattern_sum, pattern_leftover);
+
+    presum + (pattern_repeats * pattern_sum) + pattern[..pattern_leftover].iter().sum::<usize>()
+}
+
+fn find_loop(arr: &[usize], smallest_range: usize) -> Option<Range<usize>> {
+    // Try different loop lengths, with the smallest pattern possible first
+    for pattern_length in smallest_range..(arr.len() / 2) {
+        'outer: for start in 0..(arr.len() - pattern_length) {
+            // Check if we have enough range to verify the pattern
+            if start + pattern_length * 2 > arr.len() {
+                break;
+            }
+
+            // Compare the potential pattern with the next sequence
+            for i in 0..pattern_length {
+                if arr[start + i] != arr[start + pattern_length + i] {
+                    continue 'outer;
+                }
+            }
+
+            // Verify it repeats until the end of the sequence
+            let mut pos = start + pattern_length;
+            while pos + pattern_length <= arr.len() {
+                for i in 0..pattern_length {
+                    if pos + i >= arr.len() || 
+                        arr[start + i] != arr[pos + i] {
+                        continue 'outer;
+                    }
+                }
+                pos += pattern_length;
+            }
+
+            return Some(start..(start + pattern_length))
+        }
+    }
+    None
 }
