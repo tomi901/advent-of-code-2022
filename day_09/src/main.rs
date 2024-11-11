@@ -90,10 +90,10 @@ impl FromStr for Instruction {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let (dir_s, amount_s) = s.split_once(' ').expect("Should only have one space");
         let direction = match dir_s {
-            "U" => Direction::North,
-            "R" => Direction::East,
-            "D" => Direction::South,
-            "L" => Direction::West,
+            "U" => Direction::Up,
+            "R" => Direction::Left,
+            "D" => Direction::Down,
+            "L" => Direction::Right,
             c => panic!("Unknown direction: {}", c),
         };
 

@@ -30,8 +30,8 @@ impl Point2D {
     pub fn try_get_direction(&self) -> Option<(Direction, usize)> {
         match self {
             Point2D(0, 0) => None,
-            Point2D(0, y) => Some((if *y > 0 { Direction::South } else { Direction::North }, y.unsigned_abs())),
-            Point2D(x, 0) => Some((if *x > 0 { Direction::East } else { Direction::West }, x.unsigned_abs())),
+            Point2D(0, y) => Some((if *y > 0 { Direction::Down } else { Direction::Up }, y.unsigned_abs())),
+            Point2D(x, 0) => Some((if *x > 0 { Direction::Left } else { Direction::Right }, x.unsigned_abs())),
             _ => None,
         }
     }

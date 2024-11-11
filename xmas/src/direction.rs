@@ -3,22 +3,22 @@ use Direction::*;
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub enum Direction {
-    North,
-    East,
-    South,
-    West,
+    Up,
+    Left,
+    Down,
+    Right,
 }
 
 
-pub const DIRECTIONS: [Direction; 4] = [North, East, South, West];
+pub const DIRECTIONS: [Direction; 4] = [Up, Left, Down, Right];
 
 impl Direction {
     pub fn as_point(&self) -> Point2D {
         match self {
-            North => Point2D(0, -1),
-            East => Point2D(1, 0),
-            South => Point2D(0, 1),
-            West => Point2D(-1, 0),
+            Up => Point2D(0, -1),
+            Left => Point2D(1, 0),
+            Down => Point2D(0, 1),
+            Right => Point2D(-1, 0),
         }
     }
 
