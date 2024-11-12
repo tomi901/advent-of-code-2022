@@ -1,4 +1,4 @@
-use std::{collections::BinaryHeap, rc::Rc, str::FromStr};
+use std::{collections::BinaryHeap, fmt::Write, rc::Rc, str::FromStr};
 
 use anyhow::{self, Context};
 use enum_map::{Enum, EnumMap};
@@ -38,7 +38,9 @@ struct Blueprint {
 
 impl Blueprint {
     pub fn get_max_geodes_path(&self, initial_state: State) -> u64 {
+        let total_time = initial_state.time_left;
         let mut max_geodes = 0;
+        let mut best_node = None;
 
         let mut open_list = BinaryHeap::new();
         open_list.push(initial_state.as_geode_ord());
@@ -51,6 +53,7 @@ impl Blueprint {
             if candidate_with_score.key > max_geodes {
                 max_geodes = candidate_with_score.key;
                 // println!("Found candidate: {}\n{:#?}", max_geodes, candidate.as_path());
+                best_node = Some(candidate.clone());
             }
 
             // We could simplify this list by creating a ResourceList struct
@@ -58,33 +61,36 @@ impl Blueprint {
 
             let create_ore_bot = candidate.ore
                 .time_to_get(self.ore_robot_ore_cost)
-                .filter(|_| candidate.could_create_more(ResourceType::Ore, self))
-                .and_then(|time| candidate.after_strict(time + 1))
+                .filter(|_| candidate.could_create_more(Ore, self))
+                .and_then(|time| candidate.after(time + 1))
                 .map(|s| State {
                     ore: s.ore.consume(self.ore_robot_ore_cost).add_generation(1),
+                    created_robot: Ore,
                     ..s
                 });
 
             let create_clay_robot = candidate.ore
                 .time_to_get(self.clay_robot_ore_cost)
-                .filter(|_| candidate.could_create_more(ResourceType::Clay, self))
+                .filter(|_| candidate.could_create_more(Clay, self))
                 .and_then(|time| candidate.after(time + 1))
                 .map(|s| State {
                     ore: s.ore.consume(self.clay_robot_ore_cost),
                     clay: s.clay.add_generation(1),
+                    created_robot: Clay,
                     ..s
                 });
 
             let create_obsidian_robot = candidate.ore
                 .time_to_get(self.obs_robot_ore_clay_cost.0)
-                .filter(|_| candidate.could_create_more(ResourceType::Obsidian, self))
+                .filter(|_| candidate.could_create_more(Obsidian, self))
                 .and_then(|t1| candidate.clay.time_to_get(self.obs_robot_ore_clay_cost.1)
                     .map(|t2| t1.max(t2)))
-                .and_then(|time| candidate.after_strict(time + 1))
+                .and_then(|time| candidate.after(time + 1))
                 .map(|s| State {
                     ore: s.ore.consume(self.obs_robot_ore_clay_cost.0),
                     clay: s.clay.consume(self.obs_robot_ore_clay_cost.1),
                     obsidian: s.obsidian.add_generation(1),
+                    created_robot: Obsidian,
                     ..s
                 });
 
@@ -92,11 +98,12 @@ impl Blueprint {
                 .time_to_get(self.geode_robot_ore_obsidian_cost.0)
                 .and_then(|t1| candidate.obsidian.time_to_get(self.geode_robot_ore_obsidian_cost.1)
                     .map(|t2| t1.max(t2)))
-                .and_then(|time| candidate.after_strict(time + 1))
+                .and_then(|time| candidate.after(time + 1))
                 .map(|s| State {
                     ore: s.ore.consume(self.geode_robot_ore_obsidian_cost.0),
                     obsidian: s.obsidian.consume(self.geode_robot_ore_obsidian_cost.1),
                     geodes: s.geodes.add_generation(1),
+                    created_robot: Geode,
                     ..s
                 });
 
@@ -112,7 +119,20 @@ impl Blueprint {
             open_list.extend(new_paths);
         }
 
-        // println!("Blueprint {} geodes {}, nodes considered {}", self.number, max_geodes, nodes_considered);
+        // println!("Blueprint {} geodes {}, nodes considered {}\nPath:\n{:#?}", self.number, max_geodes, nodes_considered,
+        //     best_node.unwrap().as_path());
+        if self.number == 1 {
+            let mut message = format!("Blueprint {}:\n", self.number);
+            for (i, node) in best_node.unwrap().as_path().iter().enumerate() {
+                writeln!(message, "{}. Minute {} constructed {:?}:", i + 1, total_time - node.time_left, node.created_robot).unwrap();
+                writeln!(message, " - Ore: {} + {} / m", node.ore.amount, node.ore.generation_per_minute).unwrap();
+                writeln!(message, " - Clay: {} + {} / m", node.clay.amount, node.clay.generation_per_minute).unwrap();
+                writeln!(message, " - Obsidian: {} + {} / m", node.obsidian.amount, node.obsidian.generation_per_minute).unwrap();
+                writeln!(message, " - Geodes: {} + {} / m", node.geodes.amount, node.geodes.generation_per_minute).unwrap();
+            }
+            println!("{}", message);
+        }
+
         max_geodes
     }
 }
@@ -137,7 +157,7 @@ impl FromStr for Blueprint {
             .cloned()
             .reduce(|a, b| a.into_iter().map(|(k, v)| (k, v.max(b[k]))).collect::<ResourceList>())
             .unwrap_or_default();
-        // println!("max_costs: {:?}", max_costs);
+        println!("max_costs: {:?}", max_costs);
 
         Ok(Self {
             number: parse_num(&captures, 1),
@@ -160,6 +180,7 @@ struct State {
     clay: Resource,
     obsidian: Resource,
     geodes: Resource,
+    created_robot: ResourceType,
     previous: Option<Rc<Self>>,
 }
 
@@ -173,6 +194,7 @@ impl State {
             clay: Resource { amount: 0, generation_per_minute: 0 },
             obsidian: Resource { amount: 0, generation_per_minute: 0 },
             geodes: Resource { amount: 0, generation_per_minute: 0 },
+            created_robot: ResourceType::Ore,
             // generating,
             // stock: Default::default(),
             previous: None,
@@ -190,12 +212,9 @@ impl State {
             clay: self.clay.after(time),
             obsidian: self.obsidian.after(time),
             geodes: self.geodes.after(time),
+            created_robot: self.created_robot,
             previous: None,
         })
-    }
-
-    pub fn after_strict(&self, time: Minutes) -> Option<Self> {
-        self.after(time).filter(|s| s.time_left > 1)
     }
 
     pub fn final_geodes(&self) -> u64 {
@@ -314,7 +333,7 @@ fn parse_num(captures: &regex::Captures<'_>, group: usize) -> u64 {
 }
 
 fn main() -> anyhow::Result<()> {
-    part_1()?;
+    // part_1()?;
     println!();
     part_2()?;
     Ok(())
@@ -347,6 +366,26 @@ fn part_1() -> anyhow::Result<()> {
 
 fn part_2() -> anyhow::Result<()> {
     println!("Part 2:");
+    let input = std::fs::read_to_string("./input.txt").context("Error reading input file.")?;
 
+    let blueprints: Vec<_> = input.lines().take(3).map(Blueprint::from_str).collect::<Result<_, _>>()?;
+    // println!("{:?}", blueprints);
+
+    const TIME: Minutes = 32;
+    let results = blueprints.par_iter()
+        .map(|bp| (bp.number, bp.get_max_geodes_path(State::initial_state(TIME))))
+        .collect::<Vec<_>>();
+
+    for (n, geodes) in results.iter() {
+        println!("Blueprint {}: {} geode/s", n, geodes);
+    }
+
+    let result = results
+        .into_iter()
+        .map(|(_, geodes)| geodes)
+        .reduce(|a, b| a * b)
+        .unwrap();
+
+    display_result(&result);
     Ok(())
 }
