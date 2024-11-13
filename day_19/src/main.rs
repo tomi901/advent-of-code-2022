@@ -121,17 +121,17 @@ impl Blueprint {
 
         // println!("Blueprint {} geodes {}, nodes considered {}\nPath:\n{:#?}", self.number, max_geodes, nodes_considered,
         //     best_node.unwrap().as_path());
-        if self.number == 1 {
-            let mut message = format!("Blueprint {}:\n", self.number);
-            for (i, node) in best_node.unwrap().as_path().iter().enumerate() {
-                writeln!(message, "{}. Minute {} constructed {:?}:", i + 1, total_time - node.time_left, node.created_robot).unwrap();
-                writeln!(message, " - Ore: {} + {} / m", node.ore.amount, node.ore.generation_per_minute).unwrap();
-                writeln!(message, " - Clay: {} + {} / m", node.clay.amount, node.clay.generation_per_minute).unwrap();
-                writeln!(message, " - Obsidian: {} + {} / m", node.obsidian.amount, node.obsidian.generation_per_minute).unwrap();
-                writeln!(message, " - Geodes: {} + {} / m", node.geodes.amount, node.geodes.generation_per_minute).unwrap();
-            }
-            println!("{}", message);
-        }
+        // if self.number == 1 {
+        //     let mut message = format!("Blueprint {}:\n", self.number);
+        //     for (i, node) in best_node.unwrap().as_path().iter().enumerate() {
+        //         writeln!(message, "{}. Minute {} constructed {:?}:", i + 1, total_time - node.time_left, node.created_robot).unwrap();
+        //         writeln!(message, " - Ore: {} + {} / m", node.ore.amount, node.ore.generation_per_minute).unwrap();
+        //         writeln!(message, " - Clay: {} + {} / m", node.clay.amount, node.clay.generation_per_minute).unwrap();
+        //         writeln!(message, " - Obsidian: {} + {} / m", node.obsidian.amount, node.obsidian.generation_per_minute).unwrap();
+        //         writeln!(message, " - Geodes: {} + {} / m", node.geodes.amount, node.geodes.generation_per_minute).unwrap();
+        //     }
+        //     println!("{}", message);
+        // }
 
         max_geodes
     }
@@ -228,7 +228,7 @@ impl State {
 
     pub fn could_create_more(&self, res: ResourceType, bp: &Blueprint) -> bool {
         let amount = self.amount_of(res);
-        amount <= bp.max_costs[res]
+        amount <= bp.max_costs[res] + 1
     }
 
     pub fn amount_of(&self, res: ResourceType) -> u64 {
