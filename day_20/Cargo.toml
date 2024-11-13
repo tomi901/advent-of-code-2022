@@ -1,0 +1,9 @@
+[package]
+name = "day_20"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.89"
+bidirectional-map = "0.1.4"
+xmas = { version = "0.1.0", path = "../xmas" }
