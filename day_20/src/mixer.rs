@@ -13,10 +13,15 @@ pub struct ShiftMixer<'a> {
     original: &'a [i64],
     start: usize,
     map: HashMap<usize, Node>,
+    decryption_key: i64,
 }
 
 impl<'a> ShiftMixer<'a> {
     pub fn new(arr: &'a [i64]) -> Self {
+        Self::new_with_key(arr, 1)
+    }
+
+    pub fn new_with_key(arr: &'a [i64], decryption_key: i64) -> Self {
         let previous_value = |index: usize| {
             if index > 0 { index - 1 } else { arr.len() - 1 }
         };
@@ -33,6 +38,7 @@ impl<'a> ShiftMixer<'a> {
             original: arr,
             start: 0,
             map,
+            decryption_key,
         }
     }
 
@@ -41,9 +47,9 @@ impl<'a> ShiftMixer<'a> {
         // Instead of shifting X amount of times, we can just remove the node at that position
         // and then move X amount of times and insert the node there, to avoid too many writes.
         // cargo run --release is much faster but we can improve it
-        let shift = *self.original.get(at).context("No node found")?;
+        let shift = *self.original.get(at).context("No node found")? * self.decryption_key;
         match shift.cmp(&0) {
-            Ordering::Equal => {},
+            Ordering::Equal => return Ok(()),
             Ordering::Less => {
                 let mut cur_val = at;
                 let move_amount = shift.abs() % (self.original.len() as i64 - 1);
@@ -69,11 +75,11 @@ impl<'a> ShiftMixer<'a> {
                     }
 
                     cur_val = left;
-                    // println!("{:?}\n", self.iter().collect::<Vec<_>>());
                 }
             },
         };
 
+        println!("Shifted {}:\n{:?}\n", shift, self.iter().collect::<Vec<_>>());
         Ok(())
     }
 
@@ -108,7 +114,7 @@ impl<'a> ShiftMixer<'a> {
                 return None;
             }
 
-            let cur = self.original[val];
+            let cur = self.original[val] * self.decryption_key;
             val = self.map[&val].next;
             count += 1;
             Some(cur)
@@ -125,6 +131,14 @@ impl<'a> ShiftMixer<'a> {
             //     println!("{}/{}", i + 1, self.original.len());
             // }
             self.mix_element(i)?;
+        }
+        Ok(())
+    }
+
+    pub fn mix_many(&mut self, times: usize) -> Result<(), anyhow::Error> {
+        for i in 1..=times {
+            self.mix_element(i)?;
+            println!("Mixed {}/{}", i, times);
         }
         Ok(())
     }
@@ -163,6 +177,26 @@ mod tests {
             mixer.mix_element(i).unwrap();
             let nums = mixer.iter().collect::<Vec<i64>>();
             println!("({}) Comparing {:?} and {:?}", i, nums, arrangement);
+            assert_eq!(&nums, arrangement);
+        }
+    }
+
+    #[test]
+    fn mixes_correctly_with_example_data_and_key() {
+        // FIXME: After mixing, 0 doesn't end up at the start but rather at the beginning
+        let initial_arrangement = [1, 2, -3, 3, -2, 0, 4];
+        let arrangements = [
+            [0, -2434767459, 3246356612, -1623178306, 2434767459, 1623178306, 811589153],
+            [0, 2434767459, 1623178306, 3246356612, -2434767459, -1623178306, 811589153],
+            [0, 811589153, 2434767459, 3246356612, 1623178306, -1623178306, -2434767459],
+            [0, 1623178306, -2434767459, 811589153, 2434767459, 3246356612, -1623178306],
+        ];
+        let mut mixer = ShiftMixer::new_with_key(&initial_arrangement, 811589153);
+
+        for (i, arrangement) in arrangements.iter().enumerate() {
+            mixer.mix().unwrap();
+            let nums = mixer.iter().collect::<Vec<i64>>();
+            println!("({}) Comparing {:?} and {:?}", i + 1, nums, arrangement);
             assert_eq!(&nums, arrangement);
         }
     }

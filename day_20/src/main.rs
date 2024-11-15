@@ -47,8 +47,8 @@ fn part_2() -> anyhow::Result<()> {
     let input = std::fs::read_to_string("./input.txt").context("Error reading input file.")?;
 
     let numbers = parse_numbers(&input)?;
-    let mut mixer = ShiftMixer::new(&numbers);
-    mixer.mix()?;
+    let mut mixer = ShiftMixer::new_with_key(&numbers, 811589153);
+    mixer.mix_many(10)?;
 
     let mixed_numbers: Vec<i64> = mixer.iter().collect();
     let nums_file = mixed_numbers.iter().map(|i| format!("{i}\n")).collect::<String>();
