@@ -1,9 +1,8 @@
-use std::{cmp::min, collections::{BinaryHeap, HashMap, HashSet}, rc::Rc, str::FromStr};
+use std::{cmp::Reverse, collections::{BinaryHeap, HashMap, HashSet}, rc::Rc, str::FromStr};
 
 use anyhow::{self, Context};
 use regex_static::{lazy_regex, Regex, once_cell::sync::Lazy};
 use xmas::display_result;
-use yield_return::Yield;
 
 static VALVE_REGEX: Lazy<Regex> = lazy_regex!(r"Valve (\S+) .*rate=(\d+).*valves?(.*)");
 
@@ -38,6 +37,7 @@ impl FromStr for Valve {
 #[derive(Debug, Clone)]
 struct ValveSystem {
     valves: HashMap<ValveId, Valve>,
+    ordered_valves: Vec<ValveId>,
 }
 
 impl ValveSystem {
@@ -49,7 +49,13 @@ impl ValveSystem {
             Err(anyhow::anyhow!("No valve with id {} found", START_ID))?;
         }
 
-        let mut system = ValveSystem { valves: valves_map };
+        let mut ordered_valves = valves_map.keys().cloned().collect::<Vec<_>>();
+        ordered_valves.sort_by_cached_key(|v| Reverse(valves_map[v].rate));
+
+        let mut system = ValveSystem {
+            valves: valves_map,
+            ordered_valves,
+        };
         system.recalculate_paths();
         // println!("Created valve system:");
         // println!("{:#?}", system);
@@ -112,10 +118,10 @@ impl ValveSystem {
         None
     }
 
-    pub fn calculate_greatest_amount_of_pressure(&self, time_limit: usize) -> usize {
+    pub fn calculate_greatest_amount_of_pressure(&self, time_limit: usize) -> (usize, Vec<Rc<ValveBreadcrumb>>) {
         let mut max_pressure = 0;
 
-        let mut closed_list = HashSet::new();
+        let mut found_nodes = Vec::new();
         let mut open_list = BinaryHeap::<ValveBreadcrumbPriority>::new();
         open_list.push(ValveBreadcrumb {
             from: "",
@@ -127,24 +133,19 @@ impl ValveSystem {
 
         while !open_list.is_empty() {
             let candidate = Rc::new(open_list.pop().unwrap().0);
-            if closed_list.contains(&candidate) {
-                continue;
-            }
-            closed_list.insert(candidate.clone());
+            found_nodes.push(candidate.clone());
 
             if candidate.final_pressure > max_pressure {
                 max_pressure = candidate.final_pressure;
-                println!("Found candidate pressure: {}", max_pressure);
+                // println!("Found candidate pressure: {}", max_pressure);
             }
 
             open_list.extend(
-                self.find_candidates(candidate)
-                    .filter(|b| !closed_list.contains(b))
-                    .map(ValveBreadcrumbPriority),
+                self.find_candidates(candidate).map(ValveBreadcrumbPriority),
             );
         }
 
-        max_pressure
+        (max_pressure, found_nodes)
     }
 
     fn find_candidates<'a>(&'a self, cur: Rc<ValveBreadcrumb<'a>>) -> impl Iterator<Item = ValveBreadcrumb<'a>> + '_ {
@@ -175,126 +176,33 @@ impl ValveSystem {
     }
 
     pub fn calculate_greatest_pressure_with_elephant(&self, time_limit: usize) -> usize {
+        let (_, paths) = self.calculate_greatest_amount_of_pressure(time_limit);
+        println!("Testing combinations of {} path/s", paths.len());
+
+        let mut final_paths = paths.iter().collect::<Vec<_>>();
+        final_paths.sort_by_key(|bc| Reverse(bc.final_pressure));
+
         let mut max_pressure = 0;
-
-        let mut closed_list = HashSet::new();
-        let mut open_list = BinaryHeap::<ElephantBreadcrumbPriority>::new();
-        open_list.push(ElephantBreadcrumb {
-            player: Default::default(),
-            elephant: Default::default(),
-            final_pressure: 0,
-            time_left: time_limit,
-            previous: None,
-        }.into());
-
-        while !open_list.is_empty() {
-            let candidate = Rc::new(open_list.pop().unwrap().0);
-            if closed_list.contains(&candidate) {
-                continue;
-            }
-            closed_list.insert(candidate.clone());
-
-            if candidate.final_pressure > max_pressure {
-                max_pressure = candidate.final_pressure;
-                println!("Found candidate pressure: {}", max_pressure);
-
-                // let path = candidate.to_path();
-                // println!("{:#?}", path);
-            }
-
-            open_list.extend(
-                self.find_candidates_e(candidate)
-                    .filter(|b| !closed_list.contains(b))
-                    .map(ElephantBreadcrumbPriority),
-            );
-
-            // println!("debug break!");
-            // loop {}
-        }
-
-        max_pressure
-    }
-
-    fn find_candidates_e<'a>(&'a self, cur: Rc<ElephantBreadcrumb<'a>>) -> impl Iterator<Item = ElephantBreadcrumb<'a>> + '_ {
-        let time_left = cur.time_left;
-
-        if cur.player.time_to_arrive > 0 && cur.elephant.time_to_arrive > 0 {
-            unreachable!();
-        }
-
-        let previous = cur.clone();
-        let new_breadcrumbs = Yield::new(|mut y| async move {
-            if previous.player.time_to_arrive > 0 {
-                let mut new_bc = previous.as_ref().clone();
-                new_bc.previous = Some(previous);
-                y.ret(new_bc).await;
-                return;
-            }
-
-            let player_valve = self.valves.get(previous.player.to).unwrap();
-            for (id, cost) in player_valve.path_costs
+        for (i, &path) in final_paths.iter().enumerate() {
+            let used_nodes = path.traceback_iter()
+                .map(|bc| bc.to)
+                .filter(|&id| id != START_ID)
+                .collect::<HashSet<_>>();
+            let user_pressure = path.final_pressure;
+            
+            let elephant_paths = final_paths[i..]
                 .iter()
-                .map(|(id, cost)| (id, cost + 1))
-                .filter(move |(_, cost)| *cost < time_left)
-            {
-                if previous.has_visited(id) {
-                    continue;
+                .filter(|e_path| e_path.traceback_iter().all(|node| !used_nodes.contains(node.to)));
+            for &e_path in elephant_paths {
+                let total_pressure = user_pressure + e_path.final_pressure;
+                if total_pressure > max_pressure {
+                    max_pressure = total_pressure;
+                    println!("Found candidate pressure: {} ({} + {})", max_pressure, user_pressure, e_path.final_pressure);
                 }
-
-                let mut new_bc = previous.as_ref().clone();
-                let from = &previous.player.to;
-                new_bc.previous = Some(previous.clone());
-                new_bc.player = UserPath {
-                    from,
-                    to: &id,
-                    time_to_arrive: cost,
-                };
-                let target_valve = self.valves.get(id).unwrap();
-                let add_pressure = target_valve.rate * (time_left - cost);
-                new_bc.final_pressure += add_pressure;
-                y.ret(new_bc).await;
+                break;
             }
-        });
-
-        let previous = cur.clone();
-        Yield::new(|mut y| async move {
-            if previous.elephant.time_to_arrive > 0 {
-                for mut bc in new_breadcrumbs {
-                    bc.substract_next_time_step();
-                    // println!("Planned route:");
-                    // println!("{:#?}", bc.to_path());
-                    y.ret(bc).await;
-                }
-                return;
-            }
-
-            let elephant_valve = self.valves.get(previous.elephant.to).unwrap();
-            for bc in new_breadcrumbs {
-                for (to_id, cost) in elephant_valve.path_costs
-                    .iter()
-                    .map(|(id, cost)| (id, cost + 1))
-                    .filter(move |(_, cost)| *cost < time_left)
-                {
-                    if bc.player.to == to_id || previous.has_visited(&to_id) {
-                        continue;
-                    }
-
-                    let target_valve = self.valves.get(to_id).unwrap();
-                    let mut new_bc = bc.clone();
-                    let add_pressure = target_valve.rate * (time_left - cost);
-                    new_bc.final_pressure += add_pressure;
-                    
-                    new_bc.elephant.from = previous.elephant.to;
-                    new_bc.elephant.to = to_id;
-                    new_bc.elephant.time_to_arrive = cost;
-
-                    new_bc.substract_next_time_step();
-                    // println!("Planned route:");
-                    // println!("{:#?}", new_bc.to_path());
-                    y.ret(new_bc).await;
-                }
-            }
-        })
+        }
+        max_pressure
     }
 }
 
@@ -364,6 +272,17 @@ impl<'a> ValveBreadcrumb<'a> {
             }
         }
     }
+
+    pub fn traceback_iter(&self) -> impl Iterator<Item = &Self> + '_ {
+        let mut cur = Some(self);
+        std::iter::from_fn(move || {
+            let item = cur;
+            if let Some(_item) = item {
+                cur = _item.previous.as_deref();
+            }
+            item
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -409,91 +328,6 @@ impl<'a> Default for UserPath<'a> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-struct ElephantBreadcrumb<'a> {
-    player: UserPath<'a>,
-    elephant: UserPath<'a>,
-    time_left: usize,
-    final_pressure: usize,
-    previous: Option<Rc<Self>>,
-}
-
-impl<'a> ElephantBreadcrumb<'a> {
-    pub fn has_visited(&self, id: &str) -> bool {
-        let mut cur = self;
-        loop {
-            if cur.player.to == id || cur.elephant.to == id {
-                return true;
-            }
-
-            match &cur.previous {
-                Some(previous) => cur = previous.as_ref(),
-                None => return false,
-            }
-        }
-    }
-    
-    fn next_time_step(&self) -> usize {
-        min(self.player.time_to_arrive, self.elephant.time_to_arrive)
-    }
-
-    fn substract_next_time_step(&mut self) {
-        let next_time_step = self.next_time_step();
-        // println!("Next time step in {}", next_time_step);
-        self.player.time_to_arrive -= next_time_step;
-        self.elephant.time_to_arrive -= next_time_step;
-        self.time_left -= next_time_step;
-    }
-
-    pub fn to_path(&self) -> Vec<Self> {
-        let mut path = vec![];
-        let mut cur = self;
-        loop {
-            let mut new_node = cur.clone();
-            new_node.previous = None;
-            path.push(new_node);
-
-            match &cur.previous {
-                Some(previous) => cur = previous,
-                None => break,
-            }
-        }
-
-        path.reverse();
-        path
-    }
-}
-
-#[derive(Debug, Clone)]
-struct ElephantBreadcrumbPriority<'a>(ElephantBreadcrumb<'a>);
-
-impl<'a> From<ElephantBreadcrumb<'a>> for ElephantBreadcrumbPriority<'a> {
-    fn from(value: ElephantBreadcrumb<'a>) -> Self {
-        Self(value)
-    }
-}
-
-impl<'a> PartialEq for ElephantBreadcrumbPriority<'a> {
-    fn eq(&self, other: &Self) -> bool {
-        self.0.final_pressure == other.0.final_pressure
-    }
-}
-
-impl<'a> Eq for ElephantBreadcrumbPriority<'a> {
-}
-
-impl<'a> PartialOrd for ElephantBreadcrumbPriority<'a> {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl<'a> Ord for ElephantBreadcrumbPriority<'a> {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.0.final_pressure.cmp(&other.0.final_pressure)
-    }
-}
-
 fn main() -> anyhow::Result<()> {
     part_1()?;
     println!();
@@ -506,7 +340,7 @@ fn part_1() -> anyhow::Result<()> {
     let input = std::fs::read_to_string("./input.txt").context("Error reading input file.")?;
 
     let system = ValveSystem::from_str(&input)?;
-    let result = system.calculate_greatest_amount_of_pressure(30);
+    let (result, _) = system.calculate_greatest_amount_of_pressure(30);
 
     display_result(&result);
     Ok(())

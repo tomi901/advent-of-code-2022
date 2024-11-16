@@ -159,10 +159,8 @@ impl MonkeyGroup {
         };
 
         match results {
-            (Known(expected), Unknown(x)) =>
-                self.solve_for_result(x, expected),
-            (Unknown(x), Known(expected)) =>
-                self.solve_for_result(x, expected),
+            (Known(expected), Unknown(x)) |
+            (Unknown(x), Known(expected)) => self.solve_for_result(x, expected),
             _ => unreachable!(),
         }
     }
@@ -187,11 +185,9 @@ impl MonkeyGroup {
         
         let (x, x_expected) = match operation {
             (Known(n), Operation::Add, Unknown(x)) |
-            (Unknown(x), Operation::Add, Known(n)) =>
-                (x, expected - n),
+            (Unknown(x), Operation::Add, Known(n)) => (x, expected - n),
             (Known(n), Operation::Mul, Unknown(x)) |
-            (Unknown(x), Operation::Mul, Known(n)) =>
-                (x, expected / n),
+            (Unknown(x), Operation::Mul, Known(n)) => (x, expected / n),
             // n - x = expected => x = n - expected
             (Known(n), Operation::Sub, Unknown(x)) => (x, n - expected),
             // x - n = expected => x = expected + n
