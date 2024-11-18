@@ -79,7 +79,7 @@ impl<'a> ShiftMixer<'a> {
             },
         };
 
-        println!("Shifted {}:\n{:?}\n", shift, self.iter().collect::<Vec<_>>());
+        // println!("Shifted {}:\n{:?}\n", shift, self.iter().collect::<Vec<_>>());
         Ok(())
     }
 
@@ -136,8 +136,10 @@ impl<'a> ShiftMixer<'a> {
     }
 
     pub fn mix_many(&mut self, times: usize) -> Result<(), anyhow::Error> {
+        let zero_i = self.original.iter().position(|&n| n == 0).unwrap();
         for i in 1..=times {
-            self.mix_element(i)?;
+            self.mix()?;
+            self.start = zero_i;
             println!("Mixed {}/{}", i, times);
         }
         Ok(())
@@ -193,8 +195,11 @@ mod tests {
         ];
         let mut mixer = ShiftMixer::new_with_key(&initial_arrangement, 811589153);
 
+        let zero_i = initial_arrangement.iter().position(|&n| n == 0).unwrap();
         for (i, arrangement) in arrangements.iter().enumerate() {
             mixer.mix().unwrap();
+            mixer.start = zero_i;
+
             let nums = mixer.iter().collect::<Vec<i64>>();
             println!("({}) Comparing {:?} and {:?}", i + 1, nums, arrangement);
             assert_eq!(&nums, arrangement);

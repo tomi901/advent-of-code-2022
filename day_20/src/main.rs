@@ -58,11 +58,12 @@ fn part_2() -> anyhow::Result<()> {
 
     // println!("Mixed numbers: {:?}", mixed_numbers);
     let zero_i = mixed_numbers.iter().position(|n| *n == 0).unwrap();
+    println!("\nNumbers:");
     let result = [1000, 2000, 3000]
         .into_iter()
         .map(|i| {
             let num = mixed_numbers[(zero_i + i) % mixed_numbers.len()];
-            // println!("{num}");
+            println!("{num}");
             num
         })
         .sum::<i64>();
