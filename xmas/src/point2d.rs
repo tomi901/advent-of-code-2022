@@ -39,6 +39,10 @@ impl Point2D {
     pub fn try_get_direction_towards(&self, target: Point2D) -> Option<(Direction, usize)> {
         (target - *self).try_get_direction()
     }
+    
+    pub fn scale(&self, other: Point2D) -> Point2D {
+        Point2D(self.0 * other.0, self.1 * other.1)
+    }
 }
 
 impl Display for Point2D {

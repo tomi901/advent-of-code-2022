@@ -1,7 +1,8 @@
 use crate::point2d::Point2D;
+use enum_map::Enum;
 use Direction::*;
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Enum)]
 pub enum Direction {
     Up,
     Left,
@@ -30,6 +31,11 @@ impl Direction {
         DIRECTIONS[final_value]
     }
 
+    pub fn turn_rotation(&self, rot: QuarterRotation) -> Self {
+        let final_value = (self.value() + rot.value()) as usize % DIRECTIONS.len();
+        DIRECTIONS[final_value]
+    }
+
     fn value(&self) -> u8 {
         match self {
             Up => 0,
@@ -43,5 +49,23 @@ impl Direction {
 impl From<Direction> for Point2D {
     fn from(value: Direction) -> Self {
         value.as_point()
+    }
+}
+
+pub enum QuarterRotation {
+    None,
+    Right,
+    TurnAround,
+    Left,
+}
+
+impl QuarterRotation {
+    fn value(&self) -> u8 {
+        match self {
+            Self::None => 0,
+            Self::Left => 1,
+            Self::TurnAround => 2,
+            Self::Right => 3,
+        }
     }
 }
