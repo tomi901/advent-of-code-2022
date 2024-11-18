@@ -483,6 +483,8 @@ name = "day_22"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "enum-map",
+ "enum-map-derive",
  "regex_static",
  "xmas",
 ]
@@ -2367,6 +2369,8 @@ dependencies = [
 name = "xmas"
 version = "0.1.0"
 dependencies = [
+ "enum-map",
+ "enum-map-derive",
  "rstest",
  "thiserror",
 ]
