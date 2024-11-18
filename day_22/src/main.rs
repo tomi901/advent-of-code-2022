@@ -36,11 +36,11 @@ fn part_2() -> anyhow::Result<()> {
 
     let (map, movements) = input.split_once("\n\n").context("No movements found")?;
     let map = PasswordMap::from_str(map)?;
-    let mut cube_map = PasswordCubeMap::new(map, Point2D(4, 4))?;
+    let mut cube_map = PasswordCubeMap::new(map, Point2D(50, 50))?;
     let movements = Movement::many_from_str(movements)?;
 
     let path = cube_map.travel(&movements);
-    for (point, dir) in path {
+    for &(point, dir) in path.iter() {
         let tile = match dir {
             Direction::Up => b'^',
             Direction::Left => b'<',
@@ -51,23 +51,52 @@ fn part_2() -> anyhow::Result<()> {
         cube_map.unfolded.map.set_tile(point, tile);
     }
 
-    println!("Map:\n{}", cube_map.unfolded.map);
+    let &(point, dir) = path.last().unwrap();
+    cube_map.unfolded.map.set_tile(point, b'X');
 
+    // println!("Map:\n{}", cube_map.unfolded.map);
+    println!("Finished at position: {point}");
+
+    let result = display_password_result(point, dir, 1000, 4);
+    display_result(&result);
     Ok(())
 }
 
 static MOVEMENT_REGEX: Lazy<Regex> = lazy_regex!(r"\d+|R|L");
 
 fn calculate_result(position: Point2D, direction: Direction) -> u64 {
-    let y_result = 1000 * (position.1.unsigned_abs() as u64 + 1);
-    let x_result = 4 * (position.0.unsigned_abs() as u64 + 1);
-    let dir = match direction {
+    let y_value = position.1.unsigned_abs() as u64 + 1;
+    let y_result = 1000 * y_value;
+
+    let x_value = position.0.unsigned_abs() as u64 + 1;
+    let x_result = 4 * x_value;
+
+    let dir = calculate_dir_score(direction);
+    x_result + y_result + dir
+}
+
+fn display_password_result(position: Point2D, direction: Direction, row_multiplier: u64, column_multiplier: u64) -> u64 {
+    let y_value = position.1.unsigned_abs() as u64 + 1;
+    let y_result = row_multiplier * y_value;
+
+    let x_value = position.0.unsigned_abs() as u64 + 1;
+    let x_result = column_multiplier * x_value;
+
+    let dir = calculate_dir_score(direction);
+    let final_score = x_result + y_result + dir;
+    println!("Result:");
+    println!("{row_multiplier} * {y_value} + {column_multiplier} * {x_value} + {dir} = {final_score}");
+
+    final_score
+}
+
+fn calculate_dir_score(dir: Direction) -> u64 {
+    match dir {
         Direction::Right => 0,
         Direction::Down => 1,
         Direction::Left => 2,
         Direction::Up => 3,
-    };
-    x_result + y_result + dir
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -204,10 +233,12 @@ impl PasswordCubeMap {
                 };
                 face_queue.push(face_for_queue);
             }
+            // println!("Adding side: {:?}", face_side);
             face_map_partial[face_side] = Some(new_face);
         }
 
-        let face_map = face_map_partial.into_iter()
+        let face_map = face_map_partial
+            .into_iter()
             .map(|(dir, face)| (dir, face.unwrap()))
             .collect();
 
@@ -234,7 +265,7 @@ impl PasswordCubeMap {
                 },
             };
 
-            println!("Moving from {pos} {steps} steps with direction {dir:?}");
+            // println!("Moving from {pos} {steps} steps with direction {dir:?}");
 
             for _ in 0..steps {
                 path.push((pos, dir));
@@ -252,8 +283,9 @@ impl PasswordCubeMap {
 
                 let (target_pos, target_dir, target_orientation) = match move_to_face {
                     Some(move_towards_face) => {
-                        let new_orientation = orientation.move_towards(move_towards_face);
-                        println!("Moving to {:?} with orientation {:?}", move_towards_face, new_orientation);
+                        let cur_face = &self.face_map[orientation.normal];
+                        let new_orientation = cur_face.orientation.move_towards(move_towards_face);
+                        // println!("Moving to {:?} with orientation {:?}", move_towards_face, new_orientation);
 
                         let new_face = &self.face_map[new_orientation.normal];
                         let turn = new_face.orientation.get_rotation(&new_orientation).unwrap();
@@ -261,15 +293,16 @@ impl PasswordCubeMap {
                             wrap_value(would_move_to_relative.0, self.face_size.0),
                             wrap_value(would_move_to_relative.1, self.face_size.1),
                         );
-                        let adjusted_pos = wrapped_pos + new_face.origin;
+                        let adjusted_pos = self.adjust_position_relative(wrapped_pos, turn) + new_face.origin;
 
-                        println!("Translated to: {}", adjusted_pos);
-                        (adjusted_pos, dir.turn_rotation(turn), new_orientation)
+                        let new_dir = dir.turn_rotation(turn);
+                        // println!("Translated to {} with dir {:?}", adjusted_pos, new_dir);
+                        (adjusted_pos, new_dir, new_orientation)
                     },
                     None => (would_move_to, dir, orientation.clone()),
                 };
 
-                if self.unfolded.map.get_tile(would_move_to) == Some(&b'#') {
+                if self.unfolded.map.get_tile(target_pos) == Some(&b'#') {
                     break;
                 }
 
@@ -281,6 +314,15 @@ impl PasswordCubeMap {
         }
 
         path
+    }
+
+    fn adjust_position_relative(&self, point: Point2D, rotation: QuarterRotation) -> Point2D {
+        match rotation {
+            QuarterRotation::None => point,
+            QuarterRotation::Right => Point2D(self.face_size.0 - point.1 - 1, point.0),
+            QuarterRotation::TurnAround => Point2D(self.face_size.0 - point.0 - 1, self.face_size.1 - point.1 - 1),
+            QuarterRotation::Left => Point2D(point.1, self.face_size.1 - point.0 - 1),
+        }
     }
 }
 

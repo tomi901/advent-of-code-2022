@@ -52,6 +52,7 @@ impl From<Direction> for Point2D {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum QuarterRotation {
     None,
     Right,
