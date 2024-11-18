@@ -70,6 +70,20 @@ impl Map2D {
     pub fn iter(&self) -> impl Iterator<Item = &u8> + '_ {
         self.map.iter()
     }
+
+    pub fn row(&self, index: usize) -> &[u8] {
+        let start = index * self.width;
+        let end = start + self.width;
+        &self.map[start..end]
+    }
+
+    pub fn width(&self) -> usize {
+        self.width
+    }
+
+    pub fn height(&self) -> usize {
+        self.height
+    }
 }
 
 #[derive(Debug, Error, PartialEq, Eq)]

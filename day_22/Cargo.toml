@@ -1,0 +1,9 @@
+[package]
+name = "day_22"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.89"
+regex_static = "0.1.1"
+xmas = { version = "0.1.0", path = "../xmas" }

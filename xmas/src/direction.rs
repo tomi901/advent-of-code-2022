@@ -9,21 +9,34 @@ pub enum Direction {
     Right,
 }
 
-
 pub const DIRECTIONS: [Direction; 4] = [Up, Left, Down, Right];
 
 impl Direction {
     pub fn as_point(&self) -> Point2D {
         match self {
             Up => Point2D(0, -1),
-            Left => Point2D(1, 0),
+            Left => Point2D(-1, 0),
             Down => Point2D(0, 1),
-            Right => Point2D(-1, 0),
+            Right => Point2D(1, 0),
         }
     }
 
     pub fn combined(&self, other: Self) -> Point2D {
         self.as_point() + other.as_point()
+    }
+
+    pub fn turn(&self, relative_turn: Self) -> Self {
+        let final_value = (self.value() + relative_turn.value()) as usize % DIRECTIONS.len();
+        DIRECTIONS[final_value]
+    }
+
+    fn value(&self) -> u8 {
+        match self {
+            Up => 0,
+            Left => 1,
+            Down => 2,
+            Right => 3,
+        }
     }
 }
 
