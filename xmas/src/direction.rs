@@ -11,6 +11,16 @@ pub enum Direction {
 }
 
 pub const DIRECTIONS: [Direction; 4] = [Up, Left, Down, Right];
+pub const DIRECTIONS_8: [Point2D; 8] = [
+    Point2D(0, -1),
+    Point2D(1, -1),
+    Point2D(1, 0),
+    Point2D(1, 1),
+    Point2D(0, 1),
+    Point2D(-1, 1),
+    Point2D(-1, 0),
+    Point2D(-1, -1),
+];
 
 impl Direction {
     pub fn as_point(&self) -> Point2D {
