@@ -43,6 +43,10 @@ impl Point2D {
     pub fn scale(&self, other: Point2D) -> Point2D {
         Point2D(self.0 * other.0, self.1 * other.1)
     }
+
+    pub fn map(&self, f: impl Fn(isize) -> isize) -> Self {
+        Self(f(self.0), f(self.1))
+    }
 }
 
 impl Display for Point2D {
@@ -76,6 +80,14 @@ impl ops::Sub<Point2D> for Point2D {
 impl ops::SubAssign<Point2D> for Point2D {
     fn sub_assign(&mut self, rhs: Point2D) {
         *self = *self - rhs
+    }
+}
+
+impl ops::Mul<isize> for Point2D {
+    type Output = Self;
+
+    fn mul(self, rhs: isize) -> Self::Output {
+        Self(self.0 * rhs, self.1 * rhs)
     }
 }
 

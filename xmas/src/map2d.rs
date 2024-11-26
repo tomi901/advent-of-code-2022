@@ -4,7 +4,7 @@ use thiserror::Error;
 
 use crate::point2d::Point2D;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Map2D {
     map: Vec<u8>,
     width: usize,
@@ -71,10 +71,20 @@ impl Map2D {
         self.map.iter()
     }
 
+    pub fn iter_with_points(&self) -> impl Iterator<Item = (Point2D, &u8)> + '_ {
+        (0..(self.height as isize))
+            .flat_map(|y| (0..(self.width as isize)).map(move |x| Point2D(x, y)))
+            .map(|p| (p, self.get_tile(p).unwrap()))
+    }
+
     pub fn row(&self, index: usize) -> &[u8] {
         let start = index * self.width;
         let end = start + self.width;
         &self.map[start..end]
+    }
+
+    pub fn rows_iter(&self) -> impl Iterator<Item = &[u8]> {
+        (0..self.height).map(|y| self.row(y))
     }
 
     pub fn width(&self) -> usize {
@@ -83,6 +93,10 @@ impl Map2D {
 
     pub fn height(&self) -> usize {
         self.height
+    }
+
+    pub fn size(&self) -> Point2D {
+        Point2D(self.width as isize, self.height as isize)
     }
 }
 
